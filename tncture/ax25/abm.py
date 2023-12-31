@@ -158,11 +158,15 @@ class AX25ConnectedModeConnection:
 				else:
 					# out of order
 					# TODO: Restricts to non-selective reject
-					dbg("Out of order I-frame, REJ")
-					self.send_frame(AX25Frame(
-						*self._base_rsp, [],
-						AX25SControl(ss=SFrameTypes.REJ, nr=self.vr, pf=1)
-					))
+					if newmsg.control.pf:
+						dbg("Out of order I-frame, REJ")
+						self.send_frame(AX25Frame(
+							*self._base_rsp, [],
+							AX25SControl(ss=SFrameTypes.REJ, nr=self.vr, pf=1)
+						))
+						self.burst_recieve_timer.stop() # REJ includes ACK
+					else:
+						dbg("Got out of order I-frame with PF=0, ignoring for now")
 			
 			if self.state == self.States.CONNECTED and newmsg.frametype == 'S':
 				if newmsg.control.ss == SFrameTypes.RR:

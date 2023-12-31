@@ -30,6 +30,9 @@ class ClientApp(App):
         self.session.port.on_rx = self.on_port_rx
         self.quit_on_disconnect = False
         self.session_t_zero = time.time()
+        self.snoop_mode = '--snoop' in sys.argv
+        if self.snoop_mode:
+            self.session.state = self.session.States.DISCONNECTED
 
     def compose(self) -> ComposeResult:
         # with Vertical():
@@ -83,7 +86,7 @@ class ClientApp(App):
 
     def on_port_rx(self, frame):
         f = parse_ax25_frame(frame, 8)
-        if f.source.same_station(self.session.mycall):
+        if f.source.same_station(self.session.mycall) and not self.snoop_mode:
             # Crosstalk echo of my own packet
             # TODO: Better solution
             return
