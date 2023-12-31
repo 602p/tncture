@@ -173,11 +173,15 @@ class AX25ConnectedModeConnection:
 					self.va = newmsg.control.nr
 					if newmsg.dest.c:
 						dbg("Receive polling acknowledgement, reply")
-						self.send_frame(AX25Frame(
-							*self._base_rsp, [], #C/C bits backwards
-							AX25SControl(ss=SFrameTypes.RR, nr=self.vr, pf=1)
-						))
-						self.burst_recieve_timer.stop()
+						self.burst_recieve_timer.start()
+						# This is to work around LinBPQ queueing multiple RR requests in a row
+						# and then freaking out when it gets multiple responses
+
+						# self.send_frame(AX25Frame(
+						# 	*self._base_rsp, [], #C/C bits backwards
+						# 	AX25SControl(ss=SFrameTypes.RR, nr=self.vr, pf=1)
+						# ))
+						# self.burst_recieve_timer.stop()
 					else:
 						dbg("Receive normal acknowledgement")
 

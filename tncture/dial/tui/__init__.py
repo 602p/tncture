@@ -126,9 +126,13 @@ class ClientApp(App):
 
     def on_abm_state_change(self):
         self.query_one("#status").update(self.session.state.name + (" (quitting...)" if self.quit_on_disconnect else ''))
-        if self.session.state == AX25ConnectedModeConnection.States.DISCONNECTED:
+        if self.session.state == AX25ConnectedModeConnection.States.CONNECTED:
+            self.query_one('#input').disabled = False
+            self.query_one('#input').focus()
+        else:
             self.query_one('#input').disabled = True
-            if self.quit_on_disconnect:
+
+        if self.session.state == AX25ConnectedModeConnection.States.DISCONNECTED and self.quit_on_disconnect:
                 self.exit(0)
 
     def on_periodic_poll(self):
