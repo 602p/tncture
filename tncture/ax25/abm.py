@@ -33,11 +33,10 @@ class AX25ConnectedModeConnection:
 		DISCONNECTING = 2 # Sending DISC
 		DISCONNECTED = 3  # Closed
 
-	def __init__(self, port, mycall, theircall, debug=0):
+	def __init__(self, port, mycall, theircall):
 		self.mycall = mycall
 		self.theircall = theircall
 		self.port = port
-		self.debug = debug
 
 		self.stream_outgoing = b''
 		self.stream_incoming = b''
@@ -52,8 +51,8 @@ class AX25ConnectedModeConnection:
 
 		self.state = self.States.CONNECTING
 
-		self.keepalive_timer = Timer('keepalive', 15)
-		self.retransmit_timer = Timer('retransmit', 5)
+		self.keepalive_timer = Timer('keepalive', 30)
+		self.retransmit_timer = Timer('retransmit', 10)
 		self.burst_recieve_timer = Timer('burst_recieve', 3)
 
 		self.mtu = 200
@@ -64,6 +63,8 @@ class AX25ConnectedModeConnection:
 		self._base_cmd = self._base_frame(0, 1)
 		self._base_rsp = self._base_frame(1, 0)
 
+		self.debug_print = lambda *a, **k: None
+
 	def _base_frame(self, self_c, other_c):
 		return (
 			AX25SourceAddress(self.mycall.callsign, self.mycall.ssid, c=self_c),
@@ -73,10 +74,9 @@ class AX25ConnectedModeConnection:
 	def send_frame(self, frame):
 		if self.faultinject and frame.data==b'B\r':
 			self.faultinject = False
-			print("FAULT-INJECT NO RX")
+			self.debug_print("FAULT-INJECT NO RX")
 			return
-		if self.debug:
-			print("AX25ConnectedModeConnection: send:", frame)
+		self.debug_print("AX25ConnectedModeConnection: send:", frame)
 		return self.port.send_data_frame(encode_ax25_frame(frame, 8))
 
 	def initiate_disconnection(self):
@@ -98,9 +98,7 @@ class AX25ConnectedModeConnection:
 		))
 
 	def poll(self):
-		def dbg(*a, **k):
-			if self.debug:
-				print(*a, **k)
+		dbg = self.debug_print
 
 		newmsg = self.port.recieve_data_frame()
 		if newmsg:
@@ -187,14 +185,17 @@ class AX25ConnectedModeConnection:
 						pass # Should resend because this ack was for a past frame
 					
 				elif newmsg.control.ss == SFrameTypes.REJ:
-					assert self.pending_ack_frame
-					self.send_frame(AX25Frame(
-						*self._base_cmd, [],
-						AX25IControl(ns=self.vs, nr=self.vr, pf=1),
-						[0xf0],
-						self.pending_ack_frame
-					))
-					self.retransmit_timer.start()
+					if self.pending_ack_frame:
+						print("REJ for pending frame, resend")
+						self.send_frame(AX25Frame(
+							*self._base_cmd, [],
+							AX25IControl(ns=self.vs, nr=self.vr, pf=1),
+							[0xf0],
+							self.pending_ack_frame
+						))
+						self.retransmit_timer.start()
+					else:
+						print("REJ for ACKed frame, ignore")
 
 		newvr = (self.vs + 1) % self.window_size
 		# TODO: Restricts to exactly one outstanding TX frame

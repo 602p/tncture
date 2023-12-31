@@ -23,6 +23,7 @@ class ClientApp(App):
     def __init__(self, session):
         App.__init__(self)
         self.output_text = ''
+        self.log_text = ''
         self.packets = []
         self.session = session
         self.session.port.on_tx = self.on_port_tx
@@ -40,8 +41,9 @@ class ClientApp(App):
                 with VerticalScroll(id="packets-container", classes='scroll-container'):
                     yield DataTable(id="packets", classes='scroll-body')
             with TabPane("Diagnostics"):
-                with VerticalScroll(id="diagnostics-container", classes='scroll-container'):
-                    yield Label(id="diagnostics", classes='scroll-body')
+                yield Label(id="diagnostics", classes='scroll-body')
+                with VerticalScroll(id="log-container", classes='scroll-container'):
+                    yield Label(id="log", classes='scroll-body')
 
         with Container(id="bottom-container"):
             yield Markdown(id="status")
@@ -55,6 +57,7 @@ class ClientApp(App):
             'Source',
             'Dest',
             'Dir',
+            'T',
             'Control',
             'N(S)',
             'N(R)',
@@ -105,7 +108,8 @@ class ClientApp(App):
             dir_pre + str(frame.source) + "[/]",
             dir_pre + str(frame.dest) + "[/]",
             "cmd" if cc==(0,1) else ("rsp" if cc==(1,0) else "?"+str(cc)),
-            str(frame.frametype) + ": " + (frame.control.ss.name if frame.frametype=='S' else (frame.control.mmmmm.name if frame.frametype=='U' else '')),
+            str(frame.frametype),
+            frame.control.ss.name if frame.frametype=='S' else (frame.control.mmmmm.name if frame.frametype=='U' else ''),
             str(frame.control.ns) if frame.frametype == 'I' else '',
             str(frame.control.nr) if frame.frametype != 'U' else '',
             str(frame.control.pf),
@@ -142,6 +146,12 @@ class ClientApp(App):
             f"Outgoing Stream: {self.session.stream_outgoing}"
         ]))
 
+    def on_session_log(self, a):
+        message = ' '.join(map(str, a)) + "\n"
+        self.log_text += message
+        self.query_one('#log').update(self.log_text)
+        self.query_one('#log-container').scroll_end()
+
     def action_ctrl_c(self):
         if self.session.state == AX25ConnectedModeConnection.States.DISCONNECTED:
             self.exit(0)
@@ -154,6 +164,10 @@ class ClientApp(App):
 
     @work(exclusive=True, thread=True)
     def background_processing(self):
+        def log(*a, **k):
+            assert k == {}
+            self.call_from_thread(self.on_session_log, a)
+        self.session.debug_print = log
         time.sleep(0.1)
         while True:
             prev_state = self.session.state

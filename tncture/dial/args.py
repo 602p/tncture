@@ -17,5 +17,5 @@ def get_session(name):
         kiss = DummyKISSConnection()
 
     port = KISSPort(kiss, 0)
-    session = AX25ConnectedModeConnection(port, mycall, theircall, debug=0)
+    session = AX25ConnectedModeConnection(port, mycall, theircall)
     return session

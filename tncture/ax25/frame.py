@@ -111,7 +111,9 @@ class AX25Frame:
 		}[type(self.control)]
 
 	def __str__(self):
-		return f"{self.source} ({self.source.bit}) -> {self.dest} ({self.dest.bit}) [{','.join(map(str, self.repeaters))}]: {self.control} {self.data}"
+		cc = self.source.bit, self.dest.bit
+		ccname = "cmd" if cc==(0,1) else ("rsp" if cc==(1,0) else "?"+str(cc))
+		return f"{self.source} -> {self.dest} ({ccname}) [{','.join(map(str, self.repeaters))}]: {self.control} {self.data}"
 
 def parse_ax25_address(address, type_):
 	call = address[:6]
@@ -182,7 +184,7 @@ def encode_ax25_control(control, mod128mode):
 		if mod128mode == 128:
 			return bytes([(control.nr<<1) | control.pf, (control.ss.value << 1) | 0b1])
 		else:
-			return bytes([(control.nr<<5) | (control.pf << 4) | (control.ss.value << 1) | 0b1])
+			return bytes([(control.nr<<5) | (control.pf << 4) | (control.ss.value << 2) | 0b1])
 
 
 def parse_ax25_frame(frame, mod128mode=None):

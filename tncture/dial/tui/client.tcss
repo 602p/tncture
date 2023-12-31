@@ -66,3 +66,7 @@ DataTable {
     overflow: hidden auto;
     height: 100%;
 }
+
+#diagnostics {
+    border: heavy $accent;
+}
