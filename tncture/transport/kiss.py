@@ -1,5 +1,5 @@
 import socket, time
-from ax25_frame import *
+from ax25.frame import *
 
 FEND = 0xC0
 FESC = 0xDB
@@ -101,6 +101,25 @@ class TCPKISSConnection:
 
 		return frame[1:]
 
+class DummyKISSConnection:
+	def __init__(self):
+		self.rx_frame_buffers = [[] for x in range(16)]
+		self.tx_frame_buffers = [[] for x in range(16)]
+
+	def recieve_data_frame(self, port):
+		if self.rx_frame_buffers[port]:
+			return self.rx_frame_buffers.pop(0)
+
+	def send_data_frame(self, port, frame):
+		self.tx_frame_buffers[port].append(frame)
+
+	def dummy_receive(self, port, frame):
+		self.rx_frame_buffers[port].append(frame)
+
+	def dummy_pop_transmit(self, port):
+		if self.tx_frame_buffers[port]:
+			return self.tx_frame_buffers[port].pop(0)
+
 class KISSPort:
 	def __init__(self, conn, port, debug=False):
 		self.conn = conn
@@ -108,32 +127,18 @@ class KISSPort:
 		self.debug = debug
 		self.last_sent = None
 		self.debug_fd = open("kiss_debug.txt", 'a')
+		self.on_tx = lambda f:None
+		self.on_rx = lambda f:None
 
 	def send_data_frame(self, frame):
-		self.debug_fd.write(str(time.time()) + ", send, " + repr(frame) + "\n")
-		self.debug_fd.flush()
-		if self.debug:
-			print("KISSPort: send: ", parse_ax25_frame(frame, 8))
+		self.on_tx(frame)
 		self.conn.send_data_frame(self.port, frame)
 		self.last_sent = frame
 
 	def recieve_data_frame(self):
 		frame = self.conn.recieve_data_frame(self.port)
+		if frame == self.last_sent:
+			frame = None
 		if frame:
-			self.debug_fd.write(str(time.time()) + ", recv, " + repr(frame) + "\n")
-			self.debug_fd.flush()
-		if self.debug and frame and frame != self.last_sent:
-			print("KISSPort: recv: ", parse_ax25_frame(frame, 8))
+			self.on_rx(frame)
 		return frame
-
-class DummyKISSPort:
-	def __init__(self):
-		self.incoming_buf = []
-		self.outgoing_buf = []
-
-	def send_data_frame(self, frame):
-		self.outgoing_buf.append(frame)
-
-	def recieve_data_frame(self):
-		if self.incoming_buf:
-			return self.incoming_buf.pop(0)

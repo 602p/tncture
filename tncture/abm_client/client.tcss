@@ -1,0 +1,68 @@
+Screen {
+    background: $panel;
+}
+
+Input {
+    margin: 0;
+    padding: 0;
+    height: 1;
+    border: none;
+}
+
+TabPane, Input, TabbedContent, Rule {
+    margin: 0;
+    padding: 0;
+    border: none;
+}
+
+.scroll-body {
+    width: 100%;
+    padding: 0;
+    margin: 0;
+}
+
+#status {
+    height: 1;
+    padding: 0;
+    margin: 0;
+}
+
+#bottom-container {
+    width: 100%;
+    height: 5;
+    padding: 0;
+    margin: 0;
+    border: heavy;
+    dock: bottom;
+}
+
+.scroll-container {
+    background: $background 50%;
+    margin: 0;
+    padding: 0;
+/*    height: 100%;*/
+    overflow: hidden auto;
+    border: heavy $accent;
+}
+
+#tab-box {
+    padding: 0;
+    margin: 0;
+    border: none;
+    overflow: hidden auto;
+/*    height: 10;*/
+}
+
+TabPane {
+    overflow: hidden auto;
+/*    height: 5;*/
+}
+
+TabbedContent {
+/*    height: ;*/
+}
+
+DataTable {
+    overflow: hidden auto;
+    height: 100%;
+}

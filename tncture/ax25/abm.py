@@ -1,5 +1,5 @@
 from enum import Enum
-from ax25_frame import *
+from .frame import *
 import time
 
 class AX25ConnectedModeConnection:
@@ -60,6 +60,10 @@ class AX25ConnectedModeConnection:
 		if self.debug:
 			print("AX25ConnectedModeConnection: send:", frame)
 		return self.port.send_data_frame(encode_ax25_frame(frame, 8))
+
+	def initiate_disconnection(self):
+		self.state = self.States.DISCONNECTING
+		self.acknowledgement_wait_started = -1
 
 	def poll(self):
 		def dbg(*a, **k):
