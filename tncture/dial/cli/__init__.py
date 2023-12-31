@@ -1,22 +1,11 @@
-from ax25_frame import *
-from ax25_abm import *
-from kiss import *
+from ...ax25.frame import *
+from ...ax25.abm import *
+from ...transport.kiss import *
 import sys, time
 import threading
 
 
-if __name__ == '__main__':
-	if len(sys.argv) < 3:
-		print("Usage: log_packets.py mycall theircall")
-		sys.exit(1)
-
-	mycall = AX25Address.parse(sys.argv[1])
-	theircall = AX25Address.parse(sys.argv[2])
-
-	conn = TCPKISSConnection('localhost', 8001)
-	p = KISSPort(conn, 0, debug=0)
-	session = AX25ConnectedModeConnection(p, mycall, theircall, debug=0)
-
+def run_ui(session):
 	def input_handler():
 		# print("input_handler() running")
 		while 1:
@@ -43,3 +32,4 @@ if __name__ == '__main__':
 		if not connected and session.state == AX25ConnectedModeConnection.States.CONNECTED:
 			print("[client] Connected.")
 			connected = True
+	sys.exit(0)

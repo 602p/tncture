@@ -1,5 +1,5 @@
 import socket, time
-from ax25.frame import *
+from ..ax25.frame import *
 
 FEND = 0xC0
 FESC = 0xDB
@@ -126,7 +126,7 @@ class KISSPort:
 		self.port = port
 		self.debug = debug
 		self.last_sent = None
-		self.debug_fd = open("kiss_debug.txt", 'a')
+		# self.debug_fd = open("kiss_debug.txt", 'a')
 		self.on_tx = lambda f:None
 		self.on_rx = lambda f:None
 

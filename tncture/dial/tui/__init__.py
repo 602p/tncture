@@ -5,9 +5,9 @@ from textual.widgets import Input, Markdown, RichLog, Rule, Label, TabbedContent
 from textual.worker import Worker, get_current_worker
 from textual.binding import Binding
 from rich.markup import escape
-from ax25.frame import *
-from ax25.abm import *
-from transport.kiss import *
+from ...ax25.frame import *
+from ...ax25.abm import *
+from ...transport.kiss import *
 import sys
 
 class ClientApp(App):
@@ -164,21 +164,7 @@ class ClientApp(App):
                 break
 
 
-if __name__ == "__main__":
-    if len(sys.argv) < 3:
-        print("Usage: log_packets.py mycall theircall")
-        sys.exit(1)
-
-    mycall = AX25Address.parse(sys.argv[1])
-    theircall = AX25Address.parse(sys.argv[2])
-
-    if '--dummy' not in sys.argv:
-        kiss = TCPKISSConnection('localhost', 8001)
-    else:
-        kiss = DummyKISSConnection()
-
-    port = KISSPort(kiss, 0)
-    session = AX25ConnectedModeConnection(port, mycall, theircall, debug=0)
-
+def run_ui(session):
     app = ClientApp(session)
     app.run()
+    sys.exit(0)
