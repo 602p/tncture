@@ -98,11 +98,13 @@ class ClientApp(App):
         else:
             dir_pre = '[green]'
 
+        cc = (frame.source.c, frame.dest.c)
+
         row = [
             f"{time.time() - self.session_t_zero:.2f}",
             dir_pre + str(frame.source) + "[/]",
             dir_pre + str(frame.dest) + "[/]",
-            f"{frame.source.c}/{frame.dest.c}",
+            "cmd" if cc==(0,1) else ("rsp" if cc==(1,0) else "?"+str(cc)),
             str(frame.frametype) + ": " + (frame.control.ss.name if frame.frametype=='S' else (frame.control.mmmmm.name if frame.frametype=='U' else '')),
             str(frame.control.ns) if frame.frametype == 'I' else '',
             str(frame.control.nr) if frame.frametype != 'U' else '',
@@ -123,11 +125,19 @@ class ClientApp(App):
                 self.exit(0)
 
     def on_periodic_poll(self):
+        def str_timer(timer):
+            if timer.expired:
+                return f"[red]{timer.elapsed:.1f}[/]/{timer.timeout:.1f}"
+            elif timer.running:
+                return f"[green]{timer.elapsed:.1f}[/]/{timer.timeout:.1f}"
+            else:
+                return f"[grey46]STOP[/]/{timer.timeout:.1f}"
+
         self.query_one('#diagnostics').update("\n".join([
             f"V(S) = {self.session.vs}, V(R) = {self.session.vr}, V(A) = {self.session.va}",
-            f"Retry timer: {time.time() - self.session.acknowledgement_wait_started:.1f} / {self.session.retransmit_timeout:.1f}",
-            f"Burst Ack timer: {time.time() - self.session.burst_recieve_wait_started:.1f} / {self.session.burst_recieve_timeout:.1f}"
-            if self.session.vr_needs_sending else "Burst Ack timer not running",
+            f"Retransmit timer: {str_timer(self.session.retransmit_timer)}",
+            f"Keepalive timer: {str_timer(self.session.keepalive_timer)}",
+            f"Burst ACK timer: {str_timer(self.session.burst_recieve_timer)}",
             f"Pending frame: {self.session.pending_ack_frame}",
             f"Outgoing Stream: {self.session.stream_outgoing}"
         ]))
