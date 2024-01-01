@@ -6,30 +6,39 @@ import threading
 
 
 def run_ui(session):
+	stream_outgoing = None
+
 	def input_handler():
-		# print("input_handler() running")
+		nonlocal stream_outgoing
 		while 1:
 			data = input().encode('ascii') + b'\r'
-			# print("input_handler() submit", data)
-			session.stream_outgoing += data
+			stream_outgoing = data
 
 	threading.Thread(target=input_handler, daemon=True).start()
 
-	connected = False
+	# connected = False
 
-	print(f"[client] Dialing {mycall} -> {theircall} via KISS:localhost:8001")
+	print(f"[client] Dialing {session.state.config.mycall} -> {session.state.config.theircall} via KISS:localhost:8001")
 
 	while 1:
 		session.poll()
-		if session.stream_incoming:
-			print(session.stream_incoming.decode('ascii', 'ignore').replace('\r', '\n'), end='', flush=True)
-			session.stream_incoming = b''
-		# time.sleep(0.1)
-		if session.state == AX25ConnectedModeConnection.States.DISCONNECTED:
-			print("[client] Disconnected.")
-			break
+		if stream_outgoing:
+			session.write(stream_outgoing)
+			stream_outgoing = None
+		r = session.read()
+		if r:
+			print("-->", r)
+		time.sleep(0.05)
+		# if session.stream_incoming:
+		# 	print(session.stream_incoming.decode('ascii', 'ignore').replace('\r', '\n'), end='', flush=True)
+		# 	session.stream_incoming = b''
 
-		if not connected and session.state == AX25ConnectedModeConnection.States.CONNECTED:
-			print("[client] Connected.")
-			connected = True
+		# time.sleep(0.1)
+		# if session.state == AX25ConnectedModeConnection.States.DISCONNECTED:
+		# 	print("[client] Disconnected.")
+		# 	break
+
+		# if not connected and session.state == AX25ConnectedModeConnection.States.CONNECTED:
+		# 	print("[client] Connected.")
+		# 	connected = True
 	sys.exit(0)

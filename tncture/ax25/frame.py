@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from enum import Enum
 
-@dataclass
+@dataclass(frozen=True)
 class AX25Address:
 	callsign: str
 	ssid: int
@@ -22,7 +22,7 @@ class AX25Address:
 		else:
 			return cls(s, 0)
 
-@dataclass
+@dataclass(frozen=True)
 class AX25SourceAddress(AX25Address):
 	c: bool = 0
 
@@ -30,7 +30,7 @@ class AX25SourceAddress(AX25Address):
 	def bit(self):
 		return self.c
 
-@dataclass
+@dataclass(frozen=True)
 class AX25DestinationAddress(AX25Address):
 	c: bool = 0
 
@@ -38,7 +38,7 @@ class AX25DestinationAddress(AX25Address):
 	def bit(self):
 		return self.c
 
-@dataclass
+@dataclass(frozen=True)
 class AX25RepeaterAddress(AX25Address):
 	h: bool = 0
 
@@ -46,11 +46,11 @@ class AX25RepeaterAddress(AX25Address):
 	def bit(self):
 		return self.h
 
-@dataclass
+@dataclass(frozen=True)
 class AX25Control:
 	mod128mode: bool
 
-@dataclass
+@dataclass(frozen=True)
 class AX25IControl:
 	ns: int
 	nr: int
@@ -65,7 +65,7 @@ class SFrameTypes(Enum):
 	REJ  = 0b10
 	SREJ = 0b11
 
-@dataclass
+@dataclass(frozen=True)
 class AX25SControl:
 	ss: SFrameTypes
 	nr: int
@@ -85,7 +85,7 @@ class UFrameTypes(Enum):
 	XID   = 0b10111
 	TEST  = 0b11100
 
-@dataclass
+@dataclass(frozen=True)
 class AX25UControl:
 	mmmmm: UFrameTypes
 	pf: bool
@@ -93,7 +93,7 @@ class AX25UControl:
 	def __str__(self):
 		return f"U: {self.mmmmm.name}, PF={int(self.pf)}"
 
-@dataclass
+@dataclass(frozen=True)
 class AX25Frame:
 	source: AX25SourceAddress
 	dest: AX25DestinationAddress

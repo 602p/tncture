@@ -32,7 +32,7 @@ class ClientApp(App):
         self.session_t_zero = time.time()
         self.snoop_mode = '--snoop' in sys.argv
         if self.snoop_mode:
-            self.session.state = self.session.States.DISCONNECTED
+            self.session.state = self.session.state.disconnect("Snoop Mode")[0]
 
     def compose(self) -> ComposeResult:
         # with Vertical():
@@ -72,7 +72,7 @@ class ClientApp(App):
 
     def on_input_submitted(self, message: Input.Changed) -> None:
         b = message.value.encode('utf-8', 'backslashreplace') + b'\r'
-        self.session.stream_outgoing += b
+        self.session.write(b)
         self.on_abm_rx(b, from_me=True)
         self.query_one(Input).value = ''
 
@@ -86,7 +86,7 @@ class ClientApp(App):
 
     def on_port_rx(self, frame):
         f = parse_ax25_frame(frame, 8)
-        if f.source.same_station(self.session.mycall) and not self.snoop_mode:
+        if f.source.same_station(self.session.state.config.mycall) and not self.snoop_mode:
             # Crosstalk echo of my own packet
             # TODO: Better solution
             return
@@ -97,7 +97,7 @@ class ClientApp(App):
 
     def add_packet(self, is_rx, frame):
         if is_rx:
-            if frame.source.same_station(self.session.theircall):
+            if frame.source.same_station(self.session.state.config.theircall):
                 dir_pre = '[blue]'
             else:
                 dir_pre = '[grey46]'
@@ -125,14 +125,14 @@ class ClientApp(App):
         self.query_one('#packets').add_row(*row)
 
     def on_abm_state_change(self):
-        self.query_one("#status").update(self.session.state.name + (" (quitting...)" if self.quit_on_disconnect else ''))
-        if self.session.state == AX25ConnectedModeConnection.States.CONNECTED:
+        self.query_one("#status").update(self.session.state.conn_state.name + (" (quitting...)" if self.quit_on_disconnect else ''))
+        if self.session.state.conn_state == ConnState.CONNECTED:
             self.query_one('#input').disabled = False
             self.query_one('#input').focus()
         else:
             self.query_one('#input').disabled = True
 
-        if self.session.state == AX25ConnectedModeConnection.States.DISCONNECTED and self.quit_on_disconnect:
+        if self.session.state.conn_state == ConnState.DISCONNECTED and self.quit_on_disconnect:
                 self.exit(0)
 
     def on_periodic_poll(self):
@@ -145,12 +145,12 @@ class ClientApp(App):
                 return f"[grey46]STOP[/]/{timer.timeout:.1f}"
 
         self.query_one('#diagnostics').update("\n".join([
-            f"V(S) = {self.session.vs}, V(R) = {self.session.vr}, V(A) = {self.session.va}",
-            f"Retransmit timer: {str_timer(self.session.retransmit_timer)}",
-            f"Keepalive timer: {str_timer(self.session.keepalive_timer)}",
-            f"Burst ACK timer: {str_timer(self.session.burst_recieve_timer)}",
-            f"Pending frame: {self.session.pending_ack_frame}",
-            f"Outgoing Stream: {self.session.stream_outgoing}"
+            f"V(S) = {self.session.state.vs}, V(R) = {self.session.state.vr}, V(A) = {self.session.state.va}",
+            f"Retransmit timer: {str_timer(self.session.state.retransmit_timer)}",
+            f"Keepalive timer: {str_timer(self.session.state.keepalive_timer)}",
+            f"Burst ACK timer: {str_timer(self.session.state.burst_recieve_timer)}",
+            f"Outstanding frame: {self.session.state.outstanding_transmit_frame}",
+            f"Queued Bytes: {self.session.state.queued_transmit_bytes}"
         ]))
 
     def on_session_log(self, a):
@@ -160,14 +160,14 @@ class ClientApp(App):
         self.query_one('#log-container').scroll_end()
 
     def action_ctrl_c(self):
-        if self.session.state == AX25ConnectedModeConnection.States.DISCONNECTED:
+        if self.session.state.conn_state == ConnState.DISCONNECTED:
             self.exit(0)
         else:
-            self.session.initiate_disconnection()
+            self.session.disconnect()
             self.quit_on_disconnect = True
 
     def action_disconnect(self):
-        self.session.initiate_disconnection()
+        self.session.disconnect()
 
     @work(exclusive=True, thread=True)
     def background_processing(self):
@@ -177,16 +177,16 @@ class ClientApp(App):
         self.session.debug_print = log
         time.sleep(0.1)
         while True:
-            prev_state = self.session.state
+            prev_state = self.session.state.conn_state
             self.session.poll()
 
-            if self.session.stream_incoming:
-                self.call_from_thread(self.on_abm_rx, self.session.stream_incoming)
-                self.session.stream_incoming = b''
+            r = self.session.read()
+            if r:
+                self.call_from_thread(self.on_abm_rx, r)
 
             time.sleep(0.05)
 
-            if self.session.state != prev_state:
+            if self.session.state.conn_state != prev_state:
                 self.call_from_thread(self.on_abm_state_change)
 
             self.call_from_thread(self.on_periodic_poll)
