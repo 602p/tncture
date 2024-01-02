@@ -49,6 +49,9 @@ class ABMTimer:
 	def stop(self):
 		return self._set(started=None)
 
+	def __str__(self):
+		return f"{self.timeout-self.elapsed: 3.1f}/{self.timeout}" if self.running else f"STOP/{self.timeout}"
+
 @funcrec
 class ABMConfig:
 	mycall: str
@@ -252,7 +255,7 @@ class ABMSMState:
 				else:
 					return self.do_nothing("Ignoring out-of-order I-frame with PF=0")
 		else:
-			return self.do_nothing("I-frame while not CONNECTED, ignore: " + repr(new))
+			return self.do_nothing("I-frame while not CONNECTED, igno")
 
 	def step_sframe(self, new):
 		if self.is_CONNECTED:
@@ -282,7 +285,7 @@ class ABMSMState:
 			else:
 				return self.frmr("Unknown SS")
 		else:
-			return self.do_nothing("Ignore S-frame when not CONNECTED: " + repr(new))
+			return self.do_nothing("Ignore S-frame when not CONNECTED")
 
 	def step_uframe(self, new):
 		typ = new.control.mmmmm
@@ -303,11 +306,13 @@ class ABMSMState:
 		elif self.is_DISCONNECTING:
 			if typ == UFrameTypes.UA:
 				return self.disconnect("Got UA while DISCONNECTING, done")
+			if typ == UFrameTypes.DM:
+				return self.disconnect("Got DM while DISCONNECTING, already disconnected?")
 
 		if typ == UFrameTypes.DISC:
 			return self.disconnect("Got DISC", send_ua=True)
 
-		return self.do_nothing("Ignore unknown U frame: " + repr(new))
+		return self.do_nothing("Ignore unknown U frame")
 
 
 
@@ -319,20 +324,38 @@ class AX25ConnectedModeConnection:
 		self.output_buffer = b''
 
 		self.debug_print = lambda *a, **k: None
+		self.debug_state_update = lambda i, o, state, message, stopped: None
 		self.enqueued_inputs = []
 
 	def _run_to_completion(self):
+		i = None
+		if self.enqueued_inputs:
+			i = self.enqueued_inputs.pop(0)
+		did_anything = False
 		while True:
 			last_state = self.state
-			i = None
-			if self.enqueued_inputs:
-				i = self.enqueued_inputs.pop(0)
+			
 			self.state, outgoing, message = self.state.step(i)
-			if message:
-				self.debug_print(message)
+
+			if last_state!=self.state or message or i:
+				did_anything = True
+				self.debug_state_update(i, outgoing, self.state, message, False)
+				self.debug_print(repr(last_state)+"\n   <- "+repr(i))
+				if message:
+					self.debug_print('->', message)
+
 			self._handle_outgoing(outgoing)
 			if last_state == self.state:
+				assert outgoing == [], "Infinite action loop"
+				if did_anything:
+					# self.debug_state_update(i, outgoing, self.state, message, True)
+					self.debug_print(" (stopped here)")
 				return
+
+			i = None
+
+		if self.enqueued_inputs:
+			self._run_to_completion()
 
 	def _handle_outgoing(self, outgoing):
 		for row in outgoing:

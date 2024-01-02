@@ -46,7 +46,7 @@ class ClientApp(App):
             with TabPane("Diagnostics"):
                 yield Label(id="diagnostics", classes='scroll-body')
                 with VerticalScroll(id="log-container", classes='scroll-container'):
-                    yield Label(id="log", classes='scroll-body')
+                    yield DataTable(id="log", classes='scroll-body')
 
         with Container(id="bottom-container"):
             yield Markdown(id="status")
@@ -66,6 +66,21 @@ class ClientApp(App):
             'N(R)',
             'PF',
             'Body'
+        )
+
+        self.debug_initial_cols = ['Timestamp', 'Type']
+        self.debug_state_colset = list(x for x in self.session.state.__dataclass_fields__.keys() if x != 'config')
+        self.debug_output_colset = ['Message', 'Input', 'Output']
+
+        def filter_name(x):
+            if x == 'outstanding_transmit_frame': return 'outsta_frame'
+            if x == 'queued_transmit_bytes': return 'queued_bytes'
+            return x.replace('_timer', '')
+
+        self.query_one('#log').add_columns(
+            *self.debug_initial_cols,
+            *[filter_name(x) for x in self.debug_state_colset],
+            *self.debug_output_colset
         )
         self.on_abm_state_change()
         self.background_processing()
@@ -144,20 +159,48 @@ class ClientApp(App):
             else:
                 return f"[grey46]STOP[/]/{timer.timeout:.1f}"
 
-        self.query_one('#diagnostics').update("\n".join([
+        self.query_one('#diagnostics').update(" | ".join([
             f"V(S) = {self.session.state.vs}, V(R) = {self.session.state.vr}, V(A) = {self.session.state.va}",
             f"Retransmit timer: {str_timer(self.session.state.retransmit_timer)}",
             f"Keepalive timer: {str_timer(self.session.state.keepalive_timer)}",
             f"Burst ACK timer: {str_timer(self.session.state.burst_recieve_timer)}",
-            f"Outstanding frame: {self.session.state.outstanding_transmit_frame}",
-            f"Queued Bytes: {self.session.state.queued_transmit_bytes}"
+            f"Outstanding frame: {'YES' if self.session.state.outstanding_transmit_frame else 'NO '}",
+            f"Queued Bytes: {len(self.session.state.queued_transmit_bytes)}b"
         ]))
 
-    def on_session_log(self, a):
-        message = ' '.join(map(str, a)) + "\n"
-        self.log_text += message
-        self.query_one('#log').update(self.log_text)
-        self.query_one('#log-container').scroll_end()
+    def on_session_log(self, *a):
+        pass
+        # message = ' '.join(map(str, a)) + "\n"
+        # self.log_text += message
+        # self.query_one('#log').update(self.log_text)
+        # self.query_one('#log-container').scroll_end()
+
+    def on_session_state_update(self, input_, outputs, state, message, stopped):
+        def render_out(x):
+            if type(x) is ABMOutput_TXFrame:
+                return str(x.frame)
+            return str(x)
+
+        def render_in(x):
+            if type(x) is ABMInput_RXFrame:
+                return str(x.frame)
+            return str(x)
+
+        def render_arg(x):
+            if isinstance(x, Enum):
+                return x.name
+            return str(x)
+
+        row = [
+            f"{time.time() - self.session_t_zero:.2f}",
+            'x',
+            *[str(render_arg(getattr(state, k))) for k in self.debug_state_colset],
+            message,
+            render_in(input_),
+            ', '.join(render_out(x) for x in outputs)
+        ]
+
+        self.query_one('#log').add_row(*row)
 
     def action_ctrl_c(self):
         if self.session.state.conn_state == ConnState.DISCONNECTED:
@@ -171,10 +214,14 @@ class ClientApp(App):
 
     @work(exclusive=True, thread=True)
     def background_processing(self):
-        def log(*a, **k):
-            assert k == {}
-            self.call_from_thread(self.on_session_log, a)
+        def log(*a):
+            self.call_from_thread(self.on_session_log, *a)
+
+        def state_log(*a):
+            self.call_from_thread(self.on_session_state_update, *a)
+
         self.session.debug_print = log
+        self.session.debug_state_update = state_log
         time.sleep(0.1)
         while True:
             prev_state = self.session.state.conn_state

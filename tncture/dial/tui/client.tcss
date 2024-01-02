@@ -63,7 +63,7 @@ TabbedContent {
 }
 
 DataTable {
-    overflow: hidden auto;
+    overflow: auto auto;
     height: 100%;
 }
 
